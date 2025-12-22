@@ -1,0 +1,472 @@
+/**
+ * Data Parser Utility for Accelerometer Data
+ * Ported from vislogic.py to JavaScript
+ *
+ * This module handles parsing of accelerometer .txt files and extracting:
+ * - Motion sessions (grouped by device startup)
+ * - Motion events (start/stop timestamps)
+ * - Acceleration readings (x, y coordinates) during motion events only
+ */
+
+const FULL_SCALE_RANGE_G = 2.0;
+const MAX_RAW_VALUE = 32767.0;
+const SAMPLE_RATE_HZ = 100; // LIS3DH sampling rate
+const SAMPLE_INTERVAL_MS = 1000 / SAMPLE_RATE_HZ; // Milliseconds per sample (10ms)
+
+/**
+ * Parse date strings from accelerometer data files
+ * @param {string} dateStr - Date string in format "MM/DD/YYYY HH:MM:SS:ff AM/PM"
+ * @returns {Date|null} Parsed date or null if invalid
+ */
+function parseDateTimeSafe(dateStr) {
+  if (!dateStr) return null;
+
+  const trimmed = dateStr.trim();
+
+  // Try parsing formats: "08/14/2025 09:18:00:00PM" or "08/14/2025 09:18:00PM"
+  const patterns = [
+    /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2}):(\d{2})(AM|PM)/i,
+    /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})(AM|PM)/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match) {
+      const month = parseInt(match[1], 10);
+      const day = parseInt(match[2], 10);
+      const year = parseInt(match[3], 10);
+      let hours = parseInt(match[4], 10);
+      const minutes = parseInt(match[5], 10);
+      const seconds = parseInt(match[6], 10);
+      const ampm = match[match.length - 1].toUpperCase();
+
+      // Convert to 24-hour format
+      if (ampm === 'PM' && hours !== 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+
+      return new Date(year, month - 1, day, hours, minutes, seconds);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Format timestamp for display (MM/DD HH:MM:SS)
+ * @param {Date} date - Date object
+ * @returns {string} Formatted string
+ */
+function formatTimestamp(date) {
+  if (!date) return 'N/A';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${month}/${day} ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Parse accelerometer data file grouped by device startup sessions
+ * @param {string} fileContent - Raw text content of the file
+ * @returns {Object} { motionSessions: Array, overallStats: Object }
+ */
+export function parseAccelFileByEvents(fileContent) {
+  const lines = fileContent.split('\n').map(line => line.trim()).filter(line => line);
+
+  const motionSessions = [];
+  let currentSession = null;
+  let currentMotionEvent = null;
+  let currentAccelData = [];
+  let currentEventSampleCount = 0; // Track number of samples in current event
+  let xVal = null;
+  let inMotionEvent = false;
+  let globalEventCount = 0;
+
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Detect device startup - creates a new movement event
+    const matchStartup = line.match(/Device start up at:\s*(.+)/i);
+    if (matchStartup) {
+      // If there's an ongoing motion session, close it before starting new event
+      // A new device startup implies the previous device was shut down
+      if (currentMotionSession && currentEvent) {
+        // Calculate stop time based on number of samples collected
+        // Each sample is 10ms apart (100 Hz sample rate)
+        if (!currentMotionSession.stop && currentMotionSession.start) {
+          const durationMs = currentSessionSampleCount * SAMPLE_INTERVAL_MS;
+          const estimatedStop = new Date(currentMotionSession.start.getTime() + durationMs);
+          currentMotionSession.stop = estimatedStop;
+        }
+
+        currentEvent.motionSessions.push({
+          ...currentMotionSession,
+          sessionNumber: globalSessionCount
+        });
+
+        currentMotionSession = null;
+        inMotionSession = false;
+        currentSessionSampleCount = 0;
+      }
+
+      // Save previous event if exists
+      if (currentEvent) {
+        // Process and save acceleration data for previous event
+        const processedData = currentAccelData.map((point, index) => {
+          let { x, y } = point;
+
+          // If values are large integers, convert to g
+          if (Math.abs(x) > 20 || Math.abs(y) > 20) {
+            x = (x / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
+            y = (y / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
+          }
+
+          return { x, y, index };
+        });
+
+        currentEvent.accelData = processedData;
+        movementEvents.push(currentEvent);
+      }
+
+      // Start new movement event
+      const deviceStartTime = parseDateTimeSafe(matchStartup[1]);
+      currentEvent = {
+        deviceStartTime: deviceStartTime,
+        deviceStartTimeFormatted: formatTimestamp(deviceStartTime),
+        motionSessions: [],
+        accelData: []
+      };
+      currentAccelData = [];
+      i++;
+      continue;
+    }
+
+    // Detect motion session start
+    const matchStart = line.match(/Start Time of Motion Detected At:\s*(.+)/i);
+    if (matchStart) {
+      const startTime = parseDateTimeSafe(matchStart[1]);
+      currentMotionSession = { start: startTime, stop: null };
+      inMotionSession = true;
+      currentSessionSampleCount = 0; // Reset sample counter for new session
+      globalSessionCount++;
+      i++;
+      continue;
+    }
+
+    // Detect motion session stop
+    const matchStop = line.match(/Time of Stop Detected At:\s*(.+)/i);
+    if (matchStop && currentMotionSession) {
+      const stopTime = parseDateTimeSafe(matchStop[1]);
+      currentMotionSession.stop = stopTime;
+
+      if (currentEvent) {
+        currentEvent.motionSessions.push({
+          ...currentMotionSession,
+          sessionNumber: globalSessionCount
+        });
+      }
+
+      currentMotionSession = null;
+      inMotionSession = false;
+      currentSessionSampleCount = 0; // Reset sample counter
+      i++;
+      continue;
+    }
+
+    // Parse X values (only during motion sessions)
+    if (/^X\s*[:=]?\s*$/i.test(line)) {
+      if (i + 1 < lines.length && /^-?\d+(?:\.\d+)?$/.test(lines[i + 1])) {
+        xVal = parseFloat(lines[i + 1]);
+        i += 2;
+        continue;
+      }
+    }
+
+    // Parse Y values (and combine with X, only during motion sessions)
+    if (/^Y\s*[:=]?\s*$/i.test(line)) {
+      if (i + 1 < lines.length && /^-?\d+(?:\.\d+)?$/.test(lines[i + 1])) {
+        const yVal = parseFloat(lines[i + 1]);
+        if (xVal !== null && inMotionSession) {
+          currentAccelData.push({ x: xVal, y: yVal });
+          currentSessionSampleCount++; // Increment sample counter
+        }
+        xVal = null;
+        i += 2;
+        continue;
+      }
+    }
+
+    // Handle one-line format "X: value"
+    const matchX = line.match(/^X\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
+    const matchY = line.match(/^Y\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
+
+    if (matchX) {
+      xVal = parseFloat(matchX[1]);
+    }
+    if (matchY) {
+      const yVal = parseFloat(matchY[1]);
+      if (xVal !== null && inMotionSession) {
+        currentAccelData.push({ x: xVal, y: yVal });
+        currentSessionSampleCount++; // Increment sample counter
+      }
+      xVal = null;
+    }
+
+    i++;
+  }
+
+  // Handle last event and any unclosed session
+  if (currentEvent) {
+    // If there's still an unclosed session at end of file, close it based on sample count
+    if (currentMotionSession) {
+      if (!currentMotionSession.stop && currentMotionSession.start) {
+        // Calculate stop time based on number of samples collected
+        const durationMs = currentSessionSampleCount * SAMPLE_INTERVAL_MS;
+        const estimatedStop = new Date(currentMotionSession.start.getTime() + durationMs);
+        currentMotionSession.stop = estimatedStop;
+      }
+
+      currentEvent.motionSessions.push({
+        ...currentMotionSession,
+        sessionNumber: globalSessionCount
+      });
+    }
+
+    // Process acceleration data for last event
+    const processedData = currentAccelData.map((point, index) => {
+      let { x, y } = point;
+
+      // If values are large integers, convert to g
+      if (Math.abs(x) > 20 || Math.abs(y) > 20) {
+        x = (x / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
+        y = (y / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
+      }
+
+      return { x, y, index };
+    });
+
+    currentEvent.accelData = processedData;
+    movementEvents.push(currentEvent);
+  }
+
+  // Calculate overall statistics
+  const overallStats = calculateOverallStats(movementEvents);
+
+  return {
+    movementEvents,
+    overallStats
+  };
+}
+
+/**
+ * Filter motion sessions by minimum duration
+ * @param {Array} sessions - Array of motion sessions
+ * @param {number} minDuration - Minimum duration in seconds (default: 1.0)
+ * @returns {Array} Filtered sessions
+ */
+export function filterMotionSessions(sessions, minDuration = 1.0) {
+  const valid = sessions.filter(session => {
+    if (!session.start || !session.stop) return false;
+    const duration = (session.stop - session.start) / 1000;
+    return duration >= minDuration && duration > 0;
+  });
+
+  valid.sort((a, b) => a.start - b.start);
+  return valid;
+}
+
+/**
+ * Compute statistics for a single movement event
+ * @param {Object} event - Movement event object
+ * @param {number} minDuration - Minimum session duration to include
+ * @returns {Object} Event statistics
+ */
+export function computeEventStats(event, minDuration = 1.0) {
+  const filteredSessions = filterMotionSessions(event.motionSessions, minDuration);
+
+  if (filteredSessions.length === 0) {
+    return {
+      totalSessions: 0,
+      activeTime: 0,
+      idleTime: 0,
+      durations: [],
+      meanDuration: 0,
+      maxDuration: 0,
+      minDuration: 0,
+      totalSamples: event.accelData.length,
+      filteredSessions: []
+    };
+  }
+
+  let activeTime = 0;
+  let idleTime = 0;
+  const durations = [];
+
+  // Compute active time and durations
+  filteredSessions.forEach(session => {
+    const duration = Math.max((session.stop - session.start) / 1000, 0);
+    activeTime += duration;
+    durations.push(duration);
+  });
+
+  // Compute idle gaps between sessions
+  for (let i = 0; i < filteredSessions.length - 1; i++) {
+    const gap = (filteredSessions[i + 1].start - filteredSessions[i].stop) / 1000;
+    if (gap > 0.1) {
+      idleTime += gap;
+    }
+  }
+
+  // Include pre/post gaps if device timestamp is known
+  if (event.deviceStartTime && filteredSessions.length > 0) {
+    const preGap = (filteredSessions[0].start - event.deviceStartTime) / 1000;
+    if (preGap > 0.1) {
+      idleTime += preGap;
+    }
+  }
+
+  const stats = calculateStats(durations);
+
+  return {
+    totalSessions: filteredSessions.length,
+    activeTime,
+    idleTime,
+    durations,
+    meanDuration: stats.mean,
+    maxDuration: stats.max,
+    minDuration: stats.min,
+    totalSamples: event.accelData.length,
+    filteredSessions
+  };
+}
+
+/**
+ * Calculate overall statistics across all movement events
+ * @param {Array} movementEvents - Array of movement events
+ * @returns {Object} Overall statistics
+ */
+export function calculateOverallStats(movementEvents) {
+  let totalSessions = 0;
+  let totalActiveTime = 0;
+  let totalIdleTime = 0;
+  let totalSamples = 0;
+  const allDurations = [];
+
+  movementEvents.forEach(event => {
+    const eventStats = computeEventStats(event);
+    totalSessions += eventStats.totalSessions;
+    totalActiveTime += eventStats.activeTime;
+    totalIdleTime += eventStats.idleTime;
+    totalSamples += eventStats.totalSamples;
+    allDurations.push(...eventStats.durations);
+  });
+
+  const durationStats = calculateStats(allDurations);
+
+  return {
+    totalEvents: movementEvents.length,
+    totalSessions,
+    totalActiveTime,
+    totalIdleTime,
+    totalSamples,
+    meanDuration: durationStats.mean,
+    maxDuration: durationStats.max,
+    minDuration: durationStats.min
+  };
+}
+
+/**
+ * Calculate summary statistics
+ * @param {Array} durations - Array of duration values
+ * @returns {Object} { mean, max, min, total, count }
+ */
+export function calculateStats(durations) {
+  if (!durations || durations.length === 0) {
+    return { mean: 0, max: 0, min: 0, total: 0, count: 0 };
+  }
+
+  const total = durations.reduce((sum, val) => sum + val, 0);
+  const mean = total / durations.length;
+  const max = Math.max(...durations);
+  const min = Math.min(...durations);
+
+  return { mean, max, min, total, count: durations.length };
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use parseAccelFileByEvents instead
+ */
+export function parseAccelFile(fileContent) {
+  const result = parseAccelFileByEvents(fileContent);
+
+  // Return first event's data for backward compatibility
+  if (result.movementEvents.length > 0) {
+    const firstEvent = result.movementEvents[0];
+    return {
+      motionEvents: firstEvent.motionSessions,
+      accelData: firstEvent.accelData,
+      deviceStartTime: firstEvent.deviceStartTime
+    };
+  }
+
+  return {
+    motionEvents: [],
+    accelData: [],
+    deviceStartTime: null
+  };
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use filterMotionSessions instead
+ */
+export function filterMotionEvents(events, minDuration = 1.0) {
+  return filterMotionSessions(events, minDuration);
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use computeEventStats instead
+ */
+export function computeActivityStats(filteredEvents, deviceStart = null, deviceStop = null) {
+  if (!filteredEvents || filteredEvents.length === 0) {
+    return { activeTime: 0, idleTime: 0, durations: [] };
+  }
+
+  let activeTime = 0;
+  let idleTime = 0;
+  const durations = [];
+
+  filteredEvents.forEach(event => {
+    const duration = Math.max((event.stop - event.start) / 1000, 0);
+    activeTime += duration;
+    durations.push(duration);
+  });
+
+  for (let i = 0; i < filteredEvents.length - 1; i++) {
+    const gap = (filteredEvents[i + 1].start - filteredEvents[i].stop) / 1000;
+    if (gap > 0.1) {
+      idleTime += gap;
+    }
+  }
+
+  if (deviceStart && filteredEvents.length > 0) {
+    const preGap = (filteredEvents[0].start - deviceStart) / 1000;
+    if (preGap > 0.1) {
+      idleTime += preGap;
+    }
+  }
+
+  if (deviceStop && filteredEvents.length > 0) {
+    const postGap = (deviceStop - filteredEvents[filteredEvents.length - 1].stop) / 1000;
+    if (postGap > 0.1) {
+      idleTime += postGap;
+    }
+  }
+
+  return { activeTime, idleTime, durations };
+}
