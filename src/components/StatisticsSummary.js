@@ -18,18 +18,19 @@ import {
   Chip
 } from '@mui/material';
 
-function StatisticsSummary({ fileName, stats, sessionInfo }) {
+function StatisticsSummary({ fileName, stats, sessionInfo, overallStats }) {
   const {
     totalSessions = 0,
-    activeTime = 0,
-    idleTime = 0,
     meanDuration = 0,
     maxDuration = 0,
-    minDuration = 0,
-    totalSamples = 0
+    minDuration = 0
   } = stats;
 
-  const totalTime = activeTime + idleTime;
+  const {
+    daysWithMotion = 0,
+    daysWithMotionList = [],
+    totalSessionLength = 0
+  } = overallStats || {};
 
   return (
     <Paper sx={{ padding: '24px', height: '100%' }}>
@@ -62,23 +63,43 @@ function StatisticsSummary({ fileName, stats, sessionInfo }) {
         </>
       )}
 
+      <Typography variant="subtitle1" sx={{ marginBottom: '10px', fontWeight: 'bold' }}>
+        Session Statistics
+      </Typography>
+
       <TableContainer>
         <Table size="small">
           <TableBody>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold', borderBottom: 'none' }}>
-                Total Motion Events
+                Number of Sessions
               </TableCell>
               <TableCell align="right" sx={{ borderBottom: 'none' }}>
-                <strong>{totalSessions}</strong>
+                <strong>{sessionInfo?.totalSessions || 0}</strong>
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold', borderBottom: 'none' }}>
-                Total Samples
+                Total Session Length
               </TableCell>
               <TableCell align="right" sx={{ borderBottom: 'none' }}>
-                <strong>{totalSamples.toLocaleString()}</strong>
+                <strong>{totalSessionLength.toFixed(2)}s</strong>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold', borderBottom: 'none' }}>
+                Days with Motion
+              </TableCell>
+              <TableCell align="right" sx={{ borderBottom: 'none' }}>
+                <strong>{daysWithMotion}</strong>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell sx={{ borderBottom: 'none' }}>
+                Dates Used
+              </TableCell>
+              <TableCell align="right" sx={{ borderBottom: 'none', fontSize: '0.75rem' }}>
+                {daysWithMotionList.length > 0 ? daysWithMotionList.join(', ') : 'N/A'}
               </TableCell>
             </TableRow>
           </TableBody>
@@ -88,30 +109,18 @@ function StatisticsSummary({ fileName, stats, sessionInfo }) {
       <Divider sx={{ marginY: '20px' }} />
 
       <Typography variant="subtitle1" sx={{ marginBottom: '10px', fontWeight: 'bold' }}>
-        Time Analysis
+        Event Statistics
       </Typography>
 
       <TableContainer>
         <Table size="small">
           <TableBody>
             <TableRow>
-              <TableCell sx={{ borderBottom: 'none' }}>Active Time</TableCell>
-              <TableCell align="right" sx={{ borderBottom: 'none' }}>
-                {activeTime.toFixed(2)}s
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell sx={{ borderBottom: 'none' }}>Idle Time</TableCell>
-              <TableCell align="right" sx={{ borderBottom: 'none' }}>
-                {idleTime.toFixed(2)}s
-              </TableCell>
-            </TableRow>
-            <TableRow>
               <TableCell sx={{ fontWeight: 'bold', borderBottom: 'none' }}>
-                Total Time
+                Total Detection Events
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>
-                {totalTime.toFixed(2)}s
+              <TableCell align="right" sx={{ borderBottom: 'none' }}>
+                <strong>{totalSessions}</strong>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -120,13 +129,7 @@ function StatisticsSummary({ fileName, stats, sessionInfo }) {
 
       {totalSessions > 0 && (
         <>
-          <Divider sx={{ marginY: '20px' }} />
-
-          <Typography variant="subtitle1" sx={{ marginBottom: '10px', fontWeight: 'bold' }}>
-            Event Statistics
-          </Typography>
-
-          <TableContainer>
+          <TableContainer sx={{ marginTop: '10px' }}>
             <Table size="small">
               <TableBody>
                 <TableRow>
@@ -155,7 +158,7 @@ function StatisticsSummary({ fileName, stats, sessionInfo }) {
 
       <Box sx={{ marginTop: '30px', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
         <Typography variant="caption" color="text.secondary">
-          Note: Motion events grouped by device startup sessions. Statistics computed from events with minimum duration of 1.0s.
+          Note: Motion detection events grouped by device startup sessions. Statistics computed from events with minimum duration of 1.0s.
         </Typography>
       </Box>
     </Paper>

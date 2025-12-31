@@ -70,7 +70,7 @@ function TimeSeriesChart({ accelData, fileName }) {
           <Line
             type="monotone"
             dataKey="x"
-            stroke="#0072BD"
+            stroke="#D95319"
             name="X Acceleration"
             dot={false}
             strokeWidth={2}
@@ -79,7 +79,7 @@ function TimeSeriesChart({ accelData, fileName }) {
           <Line
             type="monotone"
             dataKey="y"
-            stroke="#D95319"
+            stroke="#0072BD"
             name="Y Acceleration"
             dot={false}
             strokeWidth={2}

@@ -9,11 +9,11 @@ import { Box, Typography, Button, Grid, Paper } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import FileUpload from '../components/FileUpload';
 import EventSelector from '../components/EventSelector';
-import ActiveIdleChart from '../components/ActiveIdleChart';
 import SessionDurationsChart from '../components/SessionDurationsChart';
 import TimeSeriesChart from '../components/TimeSeriesChart';
 import MotionTimelineChart from '../components/MotionTimelineChart';
 import StatisticsSummary from '../components/StatisticsSummary';
+import DailyEventCountChart from '../components/DailyEventCountChart';
 import {
   parseAccelFileByEvents,
   computeEventStats,
@@ -163,6 +163,7 @@ function DashboardPage() {
             selectedSessionIndex={selectedSessionIndex}
             onSessionChange={handleSessionChange}
             overallStats={overallStats}
+            computeEventStats={computeEventStats}
           />
 
           {/* Main Content - Two Column Layout */}
@@ -179,20 +180,19 @@ function DashboardPage() {
                   />
                 </Grid>
 
+                {/* Daily Event Count Chart */}
+                <Grid item xs={12}>
+                  <DailyEventCountChart
+                    dailyEventCounts={overallStats.dailyEventCounts}
+                  />
+                </Grid>
+
                 {/* Session Durations */}
                 <Grid item xs={12}>
                   <SessionDurationsChart
                     motionSessions={viewData.motionSessions}
                     deviceStartTimeFormatted={viewData.deviceStartTimeFormatted}
                     isAllSessions={viewData.isAllSessions}
-                  />
-                </Grid>
-
-                {/* Active/Idle Pie Chart */}
-                <Grid item xs={12} md={6}>
-                  <ActiveIdleChart
-                    activeTime={viewData.stats.activeTime}
-                    idleTime={viewData.stats.idleTime}
                   />
                 </Grid>
 
@@ -216,6 +216,7 @@ function DashboardPage() {
                   sessionTimestamp: viewData.deviceStartTimeFormatted,
                   totalSessions: overallStats.totalEvents
                 }}
+                overallStats={overallStats}
               />
             </Grid>
           </Grid>

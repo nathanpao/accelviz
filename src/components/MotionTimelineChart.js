@@ -22,10 +22,10 @@ function MotionTimelineChart({ motionSessions, deviceStartTimeFormatted, isAllSe
     return (
       <Paper sx={{ padding: '20px', height: '100%' }}>
         <Typography variant="h6" sx={{ marginBottom: '20px' }}>
-          Motion Events Timeline
+          Motion Detection Timeline
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          No motion events found
+          No motion detection events found
         </Typography>
       </Paper>
     );
@@ -96,10 +96,10 @@ function MotionTimelineChart({ motionSessions, deviceStartTimeFormatted, isAllSe
   return (
     <Paper sx={{ padding: '20px', height: '100%' }}>
       <Typography variant="h6" sx={{ marginBottom: '10px' }}>
-        Motion Events Timeline
+        Motion Detection Timeline
       </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ marginBottom: '20px' }}>
-        {motionSessions.length} motion events detected
+        {motionSessions.length} motion detection events
       </Typography>
         {needsScroll && (
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>

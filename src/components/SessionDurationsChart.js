@@ -80,10 +80,10 @@ function SessionDurationsChart({ motionSessions, deviceStartTimeFormatted, isAll
   return (
     <Paper sx={{ padding: '20px', height: '100%', overflow: 'hidden' }}>
       <Typography variant="h6" sx={{ marginBottom: '10px' }}>
-        Motion Event Durations
+        Motion Detection Event Durations
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ marginBottom: '20px' }}>
-        {motionSessions.length} valid motion events | Avg: {avgDuration.toFixed(2)}s | Total: {totalDuration.toFixed(2)}s
+        {motionSessions.length} detection events | Avg: {avgDuration.toFixed(2)}s | Total: {totalDuration.toFixed(2)}s
       </Typography>
       <ResponsiveContainer width="100%" height={320}>
         <BarChart

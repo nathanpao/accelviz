@@ -15,7 +15,7 @@ import {
   Box
 } from '@mui/material';
 
-function EventSelector({ movementEvents, selectedSessionIndex, onSessionChange, overallStats }) {
+function EventSelector({ movementEvents, selectedSessionIndex, onSessionChange, overallStats, computeEventStats }) {
   if (!movementEvents || movementEvents.length === 0) {
     return null;
   }
@@ -38,11 +38,14 @@ function EventSelector({ movementEvents, selectedSessionIndex, onSessionChange, 
             <MenuItem value={-1}>
               <strong>All Sessions</strong> ({movementEvents.length} sessions, {overallStats.totalSessions} events)
             </MenuItem>
-            {movementEvents.map((event, index) => (
-              <MenuItem key={index} value={index}>
-                Session {index + 1}: {event.deviceStartTimeFormatted} ({event.motionSessions.length} events)
-              </MenuItem>
-            ))}
+            {movementEvents.map((event, index) => {
+              const eventStats = computeEventStats(event);
+              return (
+                <MenuItem key={index} value={index}>
+                  Session {index + 1}: {event.deviceStartTimeFormatted} ({eventStats.totalSessions} events)
+                </MenuItem>
+              );
+            })}
           </Select>
         </FormControl>
       </Box>

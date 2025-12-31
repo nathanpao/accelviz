@@ -114,6 +114,12 @@ export function parseAccelFileByEvents(fileContent) {
 
       // Save previous event if exists
       if (currentEvent) {
+        // Set device stop time to last motion event's stop time
+        if (currentEvent.motionSessions.length > 0) {
+          const lastSession = currentEvent.motionSessions[currentEvent.motionSessions.length - 1];
+          currentEvent.deviceStopTime = lastSession.stop;
+        }
+
         // Process and save acceleration data for previous event
         const processedData = currentAccelData.map((point, index) => {
           let { x, y } = point;
@@ -136,6 +142,7 @@ export function parseAccelFileByEvents(fileContent) {
       currentEvent = {
         deviceStartTime: deviceStartTime,
         deviceStartTimeFormatted: formatTimestamp(deviceStartTime),
+        deviceStopTime: null, // Will be set when next device starts or at end of file
         motionSessions: [],
         accelData: []
       };
@@ -233,6 +240,12 @@ export function parseAccelFileByEvents(fileContent) {
         ...currentMotionSession,
         eventNumber: globalSessionCount
       });
+    }
+
+    // Set device stop time to last motion event's stop time
+    if (currentEvent.motionSessions.length > 0) {
+      const lastSession = currentEvent.motionSessions[currentEvent.motionSessions.length - 1];
+      currentEvent.deviceStopTime = lastSession.stop;
     }
 
     // Process acceleration data for last event
@@ -354,6 +367,8 @@ export function calculateOverallStats(movementEvents) {
   let totalIdleTime = 0;
   let totalSamples = 0;
   const allDurations = [];
+  const uniqueDates = new Set();
+  const dailyEventCounts = {};
 
   movementEvents.forEach(event => {
     const eventStats = computeEventStats(event);
@@ -362,9 +377,26 @@ export function calculateOverallStats(movementEvents) {
     totalIdleTime += eventStats.idleTime;
     totalSamples += eventStats.totalSamples;
     allDurations.push(...eventStats.durations);
+
+    // Track unique dates and daily event counts
+    eventStats.filteredSessions.forEach(session => {
+      if (session.start) {
+        const dateKey = formatDate(session.start);
+        uniqueDates.add(dateKey);
+        dailyEventCounts[dateKey] = (dailyEventCounts[dateKey] || 0) + 1;
+      }
+    });
   });
 
   const durationStats = calculateStats(allDurations);
+
+  // Calculate total device session length (sum of all device on-to-off durations)
+  let totalSessionLength = 0;
+  movementEvents.forEach(event => {
+    if (event.deviceStartTime && event.deviceStopTime) {
+      totalSessionLength += (event.deviceStopTime - event.deviceStartTime) / 1000; // in seconds
+    }
+  });
 
   return {
     totalEvents: movementEvents.length,
@@ -374,8 +406,25 @@ export function calculateOverallStats(movementEvents) {
     totalSamples,
     meanDuration: durationStats.mean,
     maxDuration: durationStats.max,
-    minDuration: durationStats.min
+    minDuration: durationStats.min,
+    daysWithMotion: uniqueDates.size,
+    daysWithMotionList: Array.from(uniqueDates).sort(),
+    dailyEventCounts,
+    totalSessionLength
   };
+}
+
+/**
+ * Format date as YYYY-MM-DD for grouping
+ * @param {Date} date - Date object
+ * @returns {string} Formatted date string
+ */
+function formatDate(date) {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
