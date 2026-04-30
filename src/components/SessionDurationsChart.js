@@ -17,6 +17,7 @@ import {
   ReferenceLine
 } from 'recharts';
 import { Paper, Typography } from '@mui/material';
+import ChartNote from './ChartNote';
 
 function SessionDurationsChart({ motionSessions, deviceStartTimeFormatted, isAllSessions = false }) {
   if (!motionSessions || motionSessions.length === 0) {
@@ -119,6 +120,7 @@ function SessionDurationsChart({ motionSessions, deviceStartTimeFormatted, isAll
           />
         </BarChart>
       </ResponsiveContainer>
+      <ChartNote text="How long each acceleration event lasted. Longer events indicate sustained changes in speed or direction. Short events may reflect a single bump or brief movement." />
     </Paper>
   );
 }

@@ -77,7 +77,7 @@ AccelViz analyzes **acceleration detection events** from accelerometer sensors, 
 - **Acceleration Detection Timeline** - Shows when acceleration events occurred and their duration
 - **Daily Event Count Chart** - Displays acceleration events per day as a bar chart
 - **Event Durations Chart** - Bar chart showing individual event durations with average line
-- **Acceleration Time Series** - X/Y acceleration data over time (during acceleration events only)
+- **Acceleration Time Series** - X/Y/Z acceleration data over time (during acceleration events only)
 - **Statistics Summary** - Comprehensive session and event metrics
 
 ### Session Management
@@ -111,15 +111,13 @@ The application expects `.txt` files with the following structure:
 
 ```
 Device start up at: 08/14/2025 09:18:00:00PM
-X:
--10.11
-Y:
--0.64
 Start Time of Motion Detected At: 08/14/2025 09:18:45:12PM
 X:
--10.08
+-0.97
 Y:
--0.47
+0.05
+Z:
+-1.43
 ...
 Time of Stop Detected At: 08/14/2025 09:19:15:12PM
 ```
@@ -129,7 +127,7 @@ Time of Stop Detected At: 08/14/2025 09:19:15:12PM
 - **Device Startup Events** - Each "Device start up at:" line creates a new session
 - **Acceleration Detection Events** - "Start Time of Motion Detected At:" triggers mark when acceleration is detected
 - **Stop Events** - "Time of Stop Detected At:" marks when acceleration stops
-- **Acceleration Data** - X/Y values collected during acceleration events only
+- **Acceleration Data** - X/Y/Z values collected during acceleration events only
 - **Sample Rate** - 100 Hz (10ms per sample) for duration calculations
 
 ### Naming Convention
@@ -201,7 +199,7 @@ Output files appear in `dist/` folder:
 **Issue: "Error parsing file"**
 - Verify file format matches expected structure
 - Check that timestamps are in format "MM/DD/YYYY HH:MM:SS:ff AM/PM"
-- Ensure X/Y data appears after acceleration detection markers
+- Ensure X/Y/Z data appears after acceleration detection markers
 
 **Issue: No events showing in charts**
 - Events must have minimum duration of 1.0 seconds

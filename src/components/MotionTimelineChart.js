@@ -16,6 +16,7 @@ import {
   Cell
 } from 'recharts';
 import { Paper, Typography } from '@mui/material';
+import ChartNote from './ChartNote';
 
 function MotionTimelineChart({ motionSessions, deviceStartTimeFormatted, isAllSessions = false }) {
   if (!motionSessions || motionSessions.length === 0) {
@@ -142,6 +143,7 @@ function MotionTimelineChart({ motionSessions, deviceStartTimeFormatted, isAllSe
         </BarChart>
         </ResponsiveContainer>
       </div>
+      <ChartNote text="Each bar is a period when the wheelchair's acceleration changed enough to trigger the sensor — starts, stops, turns, or jolts. Gaps are periods of no detected acceleration change; the wheelchair may have been stationary or rolling at a steady speed." />
     </Paper>
   );
 }

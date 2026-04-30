@@ -18,7 +18,7 @@ import {
   Chip
 } from '@mui/material';
 
-function StatisticsSummary({ fileName, stats, sessionInfo, overallStats }) {
+function StatisticsSummary({ fileName, stats, sessionInfo, sessionStats }) {
   const {
     totalSessions = 0,
     meanDuration = 0,
@@ -28,9 +28,11 @@ function StatisticsSummary({ fileName, stats, sessionInfo, overallStats }) {
 
   const {
     daysWithMotion = 0,
-    daysWithMotionList = [],
-    totalSessionLength = 0
-  } = overallStats || {};
+    totalSessionLength = 0,
+    dailyEventCounts = {}
+  } = sessionStats || {};
+
+  const dailyRows = Object.entries(dailyEventCounts).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <Paper sx={{ padding: '24px', height: '100%' }}>
@@ -94,14 +96,6 @@ function StatisticsSummary({ fileName, stats, sessionInfo, overallStats }) {
                 <strong>{daysWithMotion}</strong>
               </TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell sx={{ borderBottom: 'none' }}>
-                Dates Used
-              </TableCell>
-              <TableCell align="right" sx={{ borderBottom: 'none', fontSize: '0.75rem' }}>
-                {daysWithMotionList.length > 0 ? daysWithMotionList.join(', ') : 'N/A'}
-              </TableCell>
-            </TableRow>
           </TableBody>
         </Table>
       </TableContainer>
@@ -150,6 +144,29 @@ function StatisticsSummary({ fileName, stats, sessionInfo, overallStats }) {
                     {minDuration.toFixed(2)}s
                   </TableCell>
                 </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      )}
+
+      {dailyRows.length > 0 && (
+        <>
+          <Divider sx={{ marginY: '20px' }} />
+          <Typography variant="subtitle1" sx={{ marginBottom: '10px', fontWeight: 'bold' }}>
+            Daily Motion Event Counts
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableBody>
+                {dailyRows.map(([date, count]) => (
+                  <TableRow key={date}>
+                    <TableCell sx={{ borderBottom: 'none', fontSize: '0.8rem' }}>{date}</TableCell>
+                    <TableCell align="right" sx={{ borderBottom: 'none' }}>
+                      <strong>{count}</strong> event{count !== 1 ? 's' : ''}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </TableContainer>

@@ -14,6 +14,7 @@ import TimeSeriesChart from '../components/TimeSeriesChart';
 import MotionTimelineChart from '../components/MotionTimelineChart';
 import StatisticsSummary from '../components/StatisticsSummary';
 import DailyEventCountChart from '../components/DailyEventCountChart';
+import ActiveIdlePieChart from '../components/ActiveIdlePieChart';
 import {
   parseAccelFileByEvents,
   computeEventStats,
@@ -86,12 +87,34 @@ function DashboardPage() {
           minDuration: overallStats.minDuration,
           totalSamples: overallStats.totalSamples
         },
+        sessionStats: {
+          totalSessionLength: overallStats.totalSessionLength,
+          daysWithMotion: overallStats.daysWithMotion,
+          daysWithMotionList: overallStats.daysWithMotionList,
+          dailyEventCounts: overallStats.dailyEventCounts,
+        },
         isAllSessions: true
       };
     } else {
       // Single session view
       const event = movementEvents[selectedSessionIndex];
       const eventStats = computeEventStats(event);
+
+      // Compute per-session scoped stats
+      const sessionLength =
+        event.deviceStartTime && event.deviceStopTime
+          ? (event.deviceStopTime - event.deviceStartTime) / 1000
+          : 0;
+
+      const sessionDailyEventCounts = {};
+      const sessionDates = new Set();
+      eventStats.filteredSessions.forEach(s => {
+        if (s.start) {
+          const d = s.start.toISOString().slice(0, 10);
+          sessionDates.add(d);
+          sessionDailyEventCounts[d] = (sessionDailyEventCounts[d] || 0) + 1;
+        }
+      });
 
       return {
         motionSessions: eventStats.filteredSessions,
@@ -105,6 +128,12 @@ function DashboardPage() {
           maxDuration: eventStats.maxDuration,
           minDuration: eventStats.minDuration,
           totalSamples: eventStats.totalSamples
+        },
+        sessionStats: {
+          totalSessionLength: sessionLength,
+          daysWithMotion: sessionDates.size,
+          daysWithMotionList: Array.from(sessionDates).sort(),
+          dailyEventCounts: sessionDailyEventCounts,
         },
         isAllSessions: false
       };
@@ -203,6 +232,16 @@ function DashboardPage() {
                     fileName={fileName}
                   />
                 </Grid>
+
+                {/* Active vs Idle Pie Chart */}
+                <Grid item xs={12}>
+                  <ActiveIdlePieChart
+                    activeTime={viewData.stats.activeTime}
+                    idleTime={viewData.stats.idleTime}
+                  />
+                </Grid>
+
+                {/* Magnitude Deviation — hidden from view, component kept for future use */}
               </Grid>
             </Grid>
 
@@ -216,7 +255,7 @@ function DashboardPage() {
                   sessionTimestamp: viewData.deviceStartTimeFormatted,
                   totalSessions: overallStats.totalEvents
                 }}
-                overallStats={overallStats}
+                sessionStats={viewData.sessionStats}
               />
             </Grid>
           </Grid>

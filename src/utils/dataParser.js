@@ -5,7 +5,7 @@
  * This module handles parsing of accelerometer .txt files and extracting:
  * - Motion events (grouped by device startup)
  * - Motion sessions (start/stop timestamps)
- * - Acceleration readings (x, y coordinates) during motion sessions only
+ * - Acceleration readings (x, y, z coordinates) during motion sessions only
  */
 
 const FULL_SCALE_RANGE_G = 2.0;
@@ -80,6 +80,7 @@ export function parseAccelFileByEvents(fileContent) {
   let currentAccelData = [];
   let currentSessionSampleCount = 0; // Track number of samples in current session
   let xVal = null;
+  let yVal = null;
   let inMotionSession = false;
   let globalSessionCount = 0;
 
@@ -122,15 +123,16 @@ export function parseAccelFileByEvents(fileContent) {
 
         // Process and save acceleration data for previous event
         const processedData = currentAccelData.map((point, index) => {
-          let { x, y } = point;
+          let { x, y, z } = point;
 
           // If values are large integers, convert to g
           if (Math.abs(x) > 20 || Math.abs(y) > 20) {
             x = (x / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
             y = (y / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
+            z = z !== undefined ? (z / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G : z;
           }
 
-          return { x, y, index };
+          return { x, y, z, index };
         });
 
         currentEvent.accelData = processedData;
@@ -192,34 +194,49 @@ export function parseAccelFileByEvents(fileContent) {
       }
     }
 
-    // Parse Y values (and combine with X, only during motion sessions)
+    // Parse Y values
     if (/^Y\s*[:=]?\s*$/i.test(line)) {
       if (i + 1 < lines.length && /^-?\d+(?:\.\d+)?$/.test(lines[i + 1])) {
-        const yVal = parseFloat(lines[i + 1]);
-        if (xVal !== null && inMotionSession) {
-          currentAccelData.push({ x: xVal, y: yVal });
-          currentSessionSampleCount++; // Increment sample counter
-        }
-        xVal = null;
+        yVal = parseFloat(lines[i + 1]);
         i += 2;
         continue;
       }
     }
 
-    // Handle one-line format "X: value"
+    // Parse Z values (and combine with X and Y, only during motion sessions)
+    if (/^Z\s*[:=]?\s*$/i.test(line)) {
+      if (i + 1 < lines.length && /^-?\d+(?:\.\d+)?$/.test(lines[i + 1])) {
+        const zVal = parseFloat(lines[i + 1]);
+        if (xVal !== null && yVal !== null && inMotionSession) {
+          currentAccelData.push({ x: xVal, y: yVal, z: zVal });
+          currentSessionSampleCount++;
+        }
+        xVal = null;
+        yVal = null;
+        i += 2;
+        continue;
+      }
+    }
+
+    // Handle one-line format "X: value", "Y: value", "Z: value"
     const matchX = line.match(/^X\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
     const matchY = line.match(/^Y\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
+    const matchZ = line.match(/^Z\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
 
     if (matchX) {
       xVal = parseFloat(matchX[1]);
     }
     if (matchY) {
-      const yVal = parseFloat(matchY[1]);
-      if (xVal !== null && inMotionSession) {
-        currentAccelData.push({ x: xVal, y: yVal });
-        currentSessionSampleCount++; // Increment sample counter
+      yVal = parseFloat(matchY[1]);
+    }
+    if (matchZ) {
+      const zVal = parseFloat(matchZ[1]);
+      if (xVal !== null && yVal !== null && inMotionSession) {
+        currentAccelData.push({ x: xVal, y: yVal, z: zVal });
+        currentSessionSampleCount++;
       }
       xVal = null;
+      yVal = null;
     }
 
     i++;
@@ -250,15 +267,16 @@ export function parseAccelFileByEvents(fileContent) {
 
     // Process acceleration data for last event
     const processedData = currentAccelData.map((point, index) => {
-      let { x, y } = point;
+      let { x, y, z } = point;
 
       // If values are large integers, convert to g
       if (Math.abs(x) > 20 || Math.abs(y) > 20) {
         x = (x / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
         y = (y / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G;
+        z = z !== undefined ? (z / MAX_RAW_VALUE) * FULL_SCALE_RANGE_G : z;
       }
 
-      return { x, y, index };
+      return { x, y, z, index };
     });
 
     currentEvent.accelData = processedData;

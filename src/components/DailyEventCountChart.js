@@ -14,6 +14,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { Paper, Typography } from '@mui/material';
+import ChartNote from './ChartNote';
 
 function DailyEventCountChart({ dailyEventCounts }) {
   if (!dailyEventCounts || Object.keys(dailyEventCounts).length === 0) {
@@ -90,6 +91,7 @@ function DailyEventCountChart({ dailyEventCounts }) {
           />
         </BarChart>
       </ResponsiveContainer>
+      <ChartNote text="Number of times the sensor detected an acceleration change per day. Higher counts suggest more frequent starts, stops, or direction changes — not necessarily more total distance traveled." />
     </Paper>
   );
 }
