@@ -1,6 +1,8 @@
 # AccelViz - Accelerometer Data Visualization
 
-A desktop application for visualizing and analyzing accelerometer data from Explorer Mini devices. AccelViz helps researchers understand when and how often powered wheelchairs were used by analyzing acceleration events rather than continuous motion tracking.
+A desktop application for visualizing and analyzing accelerometer data from powered wheelchairs. AccelViz helps researchers understand wheelchair usage patterns by analyzing acceleration detection events and motion intensity.
+
+**[Analysis & Design Rationale](https://docs.google.com/document/d/1RiwQZUqN_yzni_gGMT1-958Rf6r3m6kly21VlSQjOFU/edit?usp=sharing)** — Read this for detailed methodology, hardware constraints, and metric design decisions.
 
 ## Quick Start
 
@@ -50,23 +52,26 @@ See [README-DISTRIBUTION.md](README-DISTRIBUTION.md) for detailed distribution i
 
 ## What AccelViz Measures
 
-AccelViz analyzes **acceleration detection events** from accelerometer sensors, not continuous movement. This is important because:
+AccelViz analyzes **acceleration detection events** from accelerometer sensors mounted on powered wheelchairs. This is critical to understand:
 
-- The accelerometer detects when acceleration starts and stops (triggers)
-- It does NOT track sustained movement at constant speeds
-- Data reflects usage patterns (when/how often device was used), not travel distance or duration
+- The accelerometer detects when acceleration changes (starts, stops, turns, jolts)
+- It does NOT measure sustained movement at constant speeds
+- "Idle" does not mean stationary — smooth rolling at steady speed produces no acceleration change and appears as Idle
+- Data reflects usage patterns (when/how often device was used), not travel distance or velocity
 
 ### Key Metrics
 
 **Session Statistics:**
-- Number of Sessions - device on/off cycles
-- Total Session Length - how long device was powered on
-- Days with Detection - unique days the device was used
-- Dates Used - specific dates of usage
+- Number of Sessions — device on/off cycles
+- Total Session Length — how long device was powered on
+- Days with Detection — unique days the device was active
+- Daily Motion Event Counts — number of acceleration changes per day
 
 **Event Statistics:**
-- Total Detection Events - number of acceleration detection triggers
-- Mean/Max/Min Duration - statistics about detection event lengths
+- Total Detection Events — number of acceleration triggers
+- Mean/Max/Min Duration — statistics about event lengths
+- Peak Deviation — maximum motion intensity in a session (g-units)
+- Motion Energy — total accumulated intensity (Σ|deviation|) — proxy for "how much movement"
 
 ---
 
@@ -74,17 +79,25 @@ AccelViz analyzes **acceleration detection events** from accelerometer sensors, 
 
 ### Data Visualization
 
-- **Acceleration Detection Timeline** - Shows when acceleration events occurred and their duration
-- **Daily Event Count Chart** - Displays acceleration events per day as a bar chart
-- **Event Durations Chart** - Bar chart showing individual event durations with average line
-- **Acceleration Time Series** - X/Y/Z acceleration data over time (during acceleration events only)
-- **Statistics Summary** - Comprehensive session and event metrics
+- **Motion Detection Timeline** — When acceleration events occurred and their duration
+- **Daily Event Count Chart** — Acceleration events per day with dates
+- **Event Durations Chart** — Individual event durations with average line
+- **Acceleration Time Series** — X/Y/Z acceleration data during events (toggle axes on/off)
+  - Sensor-relative axes; mounting orientation varies, so do not interpret as fixed directions
+- **Device-Flagged Events Pie Chart** — Proportion of recorded time with detected acceleration vs. no change
+- **Analysis Summary Sidebar** — Comprehensive session and event metrics in one place
 
 ### Session Management
 
-- **Session Selector** - Switch between viewing individual device sessions or all sessions combined
-- **Filtered Events** - Only includes events with minimum duration of 1.0 seconds
-- **Automatic Parsing** - Handles device startup events, acceleration detection triggers, and sample-based duration calculation
+- **Session Selector** — Switch between viewing individual device sessions or all sessions combined
+- **Filtered Events** — Only includes events with minimum duration of 1.0 seconds
+- **Automatic Parsing** — Handles device startup events, acceleration triggers, timestamps, and sample-based duration
+
+### Data Quality
+
+- Baseline calculation uses minimum-variance window (most stable segment of data)
+- Active/idle classification based on magnitude deviation from computed baseline
+- All charts include brief notes explaining what the data represents
 
 ---
 
@@ -96,11 +109,17 @@ AccelViz analyzes **acceleration detection events** from accelerometer sensors, 
 accelviz-web/
 ├── src/
 │   ├── components/          # Modular React components
+│   │   ├── ChartNote.js     # Consistent interpretation notes
+│   │   ├── ActiveIdlePieChart.js
+│   │   ├── TimeSeriesChart.js
+│   │   └── ...
 │   ├── pages/               # Application pages
-│   └── utils/               # Data parsing logic
+│   ├── utils/               # Data parsing and analysis
+│   └── index.js
 ├── public/                  # Static assets
 ├── electron.js              # Electron main process
-└── package.json             # Dependencies and build config
+├── package.json             # Dependencies and build config
+└── ANALYSIS_LOG.md          # Data validation log and design rationale
 ```
 
 ---
@@ -124,39 +143,38 @@ Time of Stop Detected At: 08/14/2025 09:19:15:12PM
 
 ### Data Structure
 
-- **Device Startup Events** - Each "Device start up at:" line creates a new session
-- **Acceleration Detection Events** - "Start Time of Motion Detected At:" triggers mark when acceleration is detected
-- **Stop Events** - "Time of Stop Detected At:" marks when acceleration stops
-- **Acceleration Data** - X/Y/Z values collected during acceleration events only
-- **Sample Rate** - 100 Hz (10ms per sample) for duration calculations
+- **Device Startup Events** — Each "Device start up at:" line creates a new session
+- **Acceleration Detection Events** — "Start Time of Motion Detected At:" marks when acceleration is detected
+- **Stop Events** — "Time of Stop Detected At:" marks when acceleration stops
+- **Acceleration Data** — X/Y/Z values collected during acceleration events only
+- **Sample Rate** — Nominal 100 Hz (10ms per sample), but effective rate varies by device (~1-10 Hz observed)
 
 ### Naming Convention
 
 - **Sessions** = Device on/off cycles (device startup → shutdown)
 - **Events** = Acceleration detection triggers (start → stop pairs)
 
-**Note:** The data structure internally uses `movementEvents` (device sessions) containing `motionSessions` (detection events), but the UI displays swapped terminology for clarity.
-
 ---
 
 ## Technology Stack
 
-- **React 18** - UI framework with functional components and hooks
-- **Material-UI v6** - Component library for consistent design
-- **Recharts 2** - Declarative charting library
-- **Electron** - Desktop application wrapper
-- **JavaScript (ES6+)** - Programming language
+- **React 18** — UI framework with functional components and hooks
+- **Material-UI v6** — Component library for consistent design
+- **Recharts 2** — Declarative charting library
+- **Electron** — Desktop application wrapper
+- **JavaScript (ES6+)** — Programming language
 
 ---
 
 ## Design Principles
 
-- **Offline-First**: All processing happens locally in the browser, no backend required
-- **Privacy-Focused**: No data leaves the user's computer
-- **Modular Architecture**: Components are independent and easily extensible
-- **Responsive Design**: Adapts to different screen sizes
-- **Material Design**: Clean, professional interface following Google's design system
-- **No Authentication**: Direct access for simplicity in research contexts
+- **Offline-First** — All processing happens locally in the browser, no backend required
+- **Privacy-Focused** — No data leaves the user's computer
+- **Transparent** — Every chart includes a note explaining what the data means and limitations
+- **Hardware-Aware** — Explicitly documents sample rate constraints and what cannot be measured
+- **Modular Architecture** — Components are independent and easily extensible
+- **Responsive Design** — Adapts to different screen sizes
+- **Material Design** — Clean, professional interface following Google's design system
 
 ---
 
@@ -194,6 +212,24 @@ Output files appear in `dist/` folder:
 
 ---
 
+## Important Notes on Interpretation
+
+### What the Data Can Tell You
+
+✅ **Usage patterns** — When and how often the wheelchair was used  
+✅ **Activity intensity** — Peak motion and total motion energy per session  
+✅ **Event frequency** — How many acceleration changes occurred per day  
+✅ **Session duration** — How long the device was powered on  
+
+### What the Data Cannot Tell You
+
+❌ **Distance traveled** — Sample rate too low for reliable integration  
+❌ **Direction of travel** — Mounting orientation unknown and variable  
+❌ **Velocity** — Integration drift makes estimates unreliable at ~1-10 Hz  
+❌ **Continuous movement** — Steady-speed rolling produces no acceleration (appears as Idle)  
+
+---
+
 ## Troubleshooting
 
 **Issue: "Error parsing file"**
@@ -205,14 +241,23 @@ Output files appear in `dist/` folder:
 - Events must have minimum duration of 1.0 seconds
 - Check that "Start Time of Motion Detected At:" and "Time of Stop Detected At:" are present
 - Verify timestamps are valid dates
+
+**Issue: Active/Idle percentages seem off**
+- "Idle" includes periods of steady-speed motion (no acceleration change detected)
+- Device-flagged events (pie chart) count only explicit start/stop triggers
+- Magnitude deviation (analytical stats) counts any detected acceleration change
+- These will rarely match — that's expected
+
 ---
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License — see LICENSE file for details
 
 ---
 
 ## Credits
 
 Created for accelerometer data analysis research at the University of Washington. Ported to JavaScript for browser-based accessibility by Nathan Pao for UW CREATE.
+
+For detailed analysis methodology, hardware constraints, and design decisions, see the [Analysis & Design Rationale document](https://docs.google.com/document/d/1RiwQZUqN_yzni_gGMT1-958Rf6r3m6kly21VlSQjOFU/edit?usp=sharing).
